@@ -1,4 +1,6 @@
 # Change Log
+v0.4.4
+Some little cosmetic changes after publishing the extension for the first time.
 
 v0.4.3
 Added checklist options in the UI palette to ask to ignore min.css and min.js files.
