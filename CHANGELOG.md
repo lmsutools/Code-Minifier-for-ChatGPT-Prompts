@@ -1,4 +1,7 @@
 # Change Log
+v0.5.0
+Bug fixes. Changed the minifier functions to remove breaklines and not to change variable names.
+
 v0.4.4
 Some little cosmetic changes after publishing the extension for the first time.
 
