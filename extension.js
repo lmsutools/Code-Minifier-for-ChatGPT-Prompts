@@ -63,6 +63,9 @@ function getFiles(baseDir, currentDir, ignoredItems, ignoreDot, ignoreMin) {
   const files = [];
   const items = fs.readdirSync(currentDir);
 
+  // Add package-lock.json and dist to the ignoredItems list
+  ignoredItems.push('package-lock.json', 'dist');
+
   items.forEach(item => {
     const fullPath = path.join(currentDir, item);
     const relPath = path.relative(baseDir, fullPath);
@@ -131,7 +134,7 @@ const minifyCommand = vscode.commands.registerCommand("extension.minifyFiles", a
     e && (o = e.split(",").map(e => e.trim()))
   }
   const r = e.fsPath,
-    a = path.join(r, "_minifiedCodes.chatgpt"),
+    a = path.join(r, ".minifiedCodes.chatgpt"),
     c = getFiles(r, r, o, t, n),
     l = new Minifier(c, a);
   l.minifyFiles();
