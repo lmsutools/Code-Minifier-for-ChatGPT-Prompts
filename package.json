@@ -1,6 +1,6 @@
 {
   "name": "code-minifier-for-chatgpt-prompts",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "🚀 Minify files of a folder into one single file to make it part of ChatGPT Coding Prompts 🧠",
   "displayName": "Code Minifier for ChatGPT Prompts",
   "publisher": "lmsutools",
@@ -19,7 +19,10 @@
     "openai",
     "natural language processing",
     "NLP",
-    "ChatGPT Coding"
+    "ChatGPT Coding",
+    "javascript obfuscate",
+    "javascript obfuscator",
+    "js obfuscator"
   ],
   "activationEvents": [
     "onCommand:extension.minifyFiles"
@@ -32,6 +35,7 @@
     "clean-css": "^4.2.3",
     "glob": "^9.3.2",
     "html-minifier": "^3.5.21",
+    "javascript-obfuscator": "^4.0.2",
     "minimatch": "^7.4.3",
     "strip-json-comments": "^5.0.0",
     "terser": "^5.16.9",
@@ -42,6 +46,14 @@
       {
         "command": "extension.minifyFiles",
         "title": "Code Minifier for ChatGPT Prompts"
+      },
+      {
+        "command": "extension.obfuscateCurrentJSFile",
+        "title": "Obfuscate current JS file"
+      },
+      {
+        "command": "extension.obfuscateAllJSInWorkspace",
+        "title": "Obfuscate all JS in the workspace"
       }
     ]
   }

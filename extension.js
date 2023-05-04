@@ -1,9 +1,25 @@
 const fs = require("fs"),
   path = require("path"),
   vscode = require("vscode"),
-  htmlMinifier = require("html-minifier").minify;
+  htmlMinifier = require("html-minifier").minify,
+  JavaScriptObfuscator = require("javascript-obfuscator");
 
 class Minifier {
+  async obfuscateJsFiles(files) {
+    const obfuscatedSummary = [];
+    for (const file of files) {
+      const filePath = path.join(this.outputFilePath, "..", file.path);
+      try {
+        const fileContent = fs.readFileSync(filePath, "utf-8");
+        const obfuscatedCode = JavaScriptObfuscator.obfuscate(fileContent);
+        fs.writeFileSync(filePath, obfuscatedCode.getObfuscatedCode());
+        obfuscatedSummary.push(`<"file: ${file.path}">Successfully obfuscated</"file: ${file.path}">`);
+      } catch (error) {
+        obfuscatedSummary.push(`<"file: ${file.path}">Couldn't be obfuscated: ${error.message}</"file: ${file.path}">`);
+      }
+    }
+    fs.writeFileSync(path.join(this.outputFilePath, "..", "obfuscated.txt"), obfuscatedSummary.join("\n"));
+  }
   constructor(e, i) {
     this.files = e, this.outputFilePath = i, this.errors = []
   }
@@ -140,7 +156,75 @@ const minifyCommand = vscode.commands.registerCommand("extension.minifyFiles", a
   l.minifyFiles();
   const h = await vscode.workspace.openTextDocument(a);
   await vscode.window.showTextDocument(h, vscode.ViewColumn.Active)
+
+  const obfuscationOption = await vscode.window.showQuickPick(
+    [
+      { label: "Obfuscate current JS file", value: "current" },
+      { label: "Obfuscate all JS in the workspace", value: "all" },
+    ],
+    { placeHolder: "Select an obfuscation option" }
+  );
+
+  const jsFiles = c.filter((file) => file.extension === "js");
+
+  if (obfuscationOption.value === "current") {
+    const activeTextEditor = vscode.window.activeTextEditor;
+    if (activeTextEditor) {
+      const activeDocument = activeTextEditor.document;
+      const activeFile = jsFiles.find((file) => file.path === path.relative(r, activeDocument.uri.fsPath));
+      if (activeFile) {
+        await l.obfuscateJsFiles([activeFile]);
+      }
+    }
+  } else if (obfuscationOption.value === "all") {
+    await l.obfuscateJsFiles(jsFiles);
+  }
+  
+});
+
+const obfuscateCurrentJSFile = vscode.commands.registerCommand("extension.obfuscateCurrentJSFile", async () => {
+  const e = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri : (await vscode.window.showOpenDialog({
+    canSelectFiles: !1,
+    canSelectFolders: !0,
+    canSelectMany: !1,
+    openLabel: "Select Folder"
+  }))[0];
+  if (!e) return;
+
+  const r = e.fsPath,
+    a = path.join(r, ".minifiedCodes.chatgpt"),
+    c = getFiles(r, r, [], false, false),
+    l = new Minifier(c, a);
+
+  const activeTextEditor = vscode.window.activeTextEditor;
+  if (activeTextEditor) {
+    const activeDocument = activeTextEditor.document;
+    const activeFile = c.find((file) => file.path === path.relative(r, activeDocument.uri.fsPath) && file.extension === "js");
+    if (activeFile) {
+      await l.obfuscateJsFiles([activeFile]);
+    }
+  }
+});
+
+const obfuscateAllJSInWorkspace = vscode.commands.registerCommand("extension.obfuscateAllJSInWorkspace", async () => {
+  const e = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri : (await vscode.window.showOpenDialog({
+    canSelectFiles: !1,
+    canSelectFolders: !0,
+    canSelectMany: !1,
+    openLabel: "Select Folder"
+  }))[0];
+  if (!e) return;
+
+  const r = e.fsPath,
+    a = path.join(r, ".minifiedCodes.chatgpt"),
+    c = getFiles(r, r, [], false, false),
+    l = new Minifier(c, a);
+
+  const jsFiles = c.filter((file) => file.extension === "js");
+  await l.obfuscateJsFiles(jsFiles);
 });
 
 exports.minifyCommand = minifyCommand;
+exports.obfuscateCurrentJSFile = obfuscateCurrentJSFile;
+exports.obfuscateAllJSInWorkspace = obfuscateAllJSInWorkspace;
 

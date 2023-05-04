@@ -1,4 +1,9 @@
 # Change Log
+v0.6
+Added two new commands (functions) to have a JS Obfuscator. Press Ctrl+P and type:
+a. Obfuscate all JS in the workspace
+b. Obfuscate current JS file
+
 v0.5.0
 Bug fixes. Changed the minifier functions to remove breaklines and not to change variable names.
 
