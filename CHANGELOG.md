@@ -1,4 +1,7 @@
 # Change Log
+v0.6.1
+Added support for .ejs
+Fixed bug for error  "Cannot read properties of undefined (reading 'value')"
 v0.6
 Added two new commands (functions) to have a JS Obfuscator. Press Ctrl+P and type:
 a. Obfuscate all JS in the workspace

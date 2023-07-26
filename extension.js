@@ -36,7 +36,7 @@ class Minifier {
   }
   async minifyFiles() {
     if (fs.existsSync(this.outputFilePath) && fs.unlinkSync(this.outputFilePath), await Promise.all(this.files.map(async e => {
-        if ("package-lock" === e.name || this.shouldIgnoreFile(e.name, ['.png', '.jpg', '.sample', '.lock', '.md', '.babelrc'])) return;
+      if ("package-lock" === e.name || this.shouldIgnoreFile(e.name, ['.png', '.jpg', '.sample', '.lock', '.md', '.babelrc', '.vsix', '.vscodeignore'])) return;
         const i = path.join(this.outputFilePath, "..", e.path),
           t = fs.readFileSync(i).toString();
         let s;
@@ -51,6 +51,7 @@ class Minifier {
               s = this.customMinify(t);
               break;
             case "html":
+            case "ejs":
               s = htmlMinifier(t, { removeComments: true, collapseWhitespace: true });
               break;
 
@@ -167,17 +168,22 @@ const minifyCommand = vscode.commands.registerCommand("extension.minifyFiles", a
 
   const jsFiles = c.filter((file) => file.extension === "js");
 
-  if (obfuscationOption.value === "current") {
-    const activeTextEditor = vscode.window.activeTextEditor;
-    if (activeTextEditor) {
-      const activeDocument = activeTextEditor.document;
-      const activeFile = jsFiles.find((file) => file.path === path.relative(r, activeDocument.uri.fsPath));
-      if (activeFile) {
-        await l.obfuscateJsFiles([activeFile]);
+  
+  if (obfuscationOption && obfuscationOption.value) {
+    const jsFiles = c.filter((file) => file.extension === "js");
+
+    if (obfuscationOption.value === "current") {
+      const activeTextEditor = vscode.window.activeTextEditor;
+      if (activeTextEditor) {
+        const activeDocument = activeTextEditor.document;
+        const activeFile = jsFiles.find((file) => file.path === path.relative(r, activeDocument.uri.fsPath));
+        if (activeFile) {
+          await l.obfuscateJsFiles([activeFile]);
+        }
       }
+    } else if (obfuscationOption.value === "all") {
+      await l.obfuscateJsFiles(jsFiles);
     }
-  } else if (obfuscationOption.value === "all") {
-    await l.obfuscateJsFiles(jsFiles);
   }
   
 });
