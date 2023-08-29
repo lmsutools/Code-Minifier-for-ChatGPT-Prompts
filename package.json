@@ -1,6 +1,6 @@
 {
   "name": "code-minifier-for-chatgpt-prompts",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "🚀 Minify files of a folder into one single file to make it part of ChatGPT Coding Prompts 🧠",
   "displayName": "Code Minifier for ChatGPT Prompts",
   "publisher": "lmsutools",
@@ -36,10 +36,12 @@
     "glob": "^9.3.2",
     "html-minifier": "^3.5.21",
     "javascript-obfuscator": "^4.0.2",
+    "minify-xml": "^4.0.0",
     "minimatch": "^7.4.3",
     "strip-json-comments": "^5.0.0",
     "terser": "^5.16.9",
-    "uglify-js": "^3.9.2"
+    "uglify-js": "^3.9.2",
+    "xml-minifier": "^1.0.1"
   },
   "contributes": {
     "commands": [

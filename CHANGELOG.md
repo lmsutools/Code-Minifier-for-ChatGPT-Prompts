@@ -1,4 +1,7 @@
 # Change Log
+v0.7.0
+Added support for .xaml and .cs files
+
 v0.6.1
 Added support for .ejs
 Fixed bug for error  "Cannot read properties of undefined (reading 'value')"

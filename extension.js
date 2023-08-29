@@ -34,6 +34,29 @@ class Minifier {
       .map(line => line.trim())
       .join('');
   }
+
+  minifyXAML(content) {
+    return content
+      .replace(/\s*\n\s*/g, '')  // Remove line breaks and extra spaces
+      .replace(/\s*\>\s*/g, '>')  // Remove spaces around '>'
+      .replace(/\s*\</g, '<')     // Remove spaces around '<'
+      .replace(/\s+/g, ' ');      // Replace multiple spaces with single space
+  }
+  
+   minifyCSharpCode(code) {
+    // Remove single line comments
+    code = code.replace(/\/\/.*/g, '');
+    // Remove multi-line comments
+    code = code.replace(/\/\*[\s\S]*?\*\//g, '');
+    // Remove newlines
+    code = code.replace(/\n/g, '');
+    // Remove unnecessary spaces
+    code = code.replace(/\s+/g, ' ');
+    // Remove spaces before and after some special characters
+    code = code.replace(/\s*([;,:{}()])\s*/g, '$1');
+    return code;
+}
+
   async minifyFiles() {
     if (fs.existsSync(this.outputFilePath) && fs.unlinkSync(this.outputFilePath), await Promise.all(this.files.map(async e => {
       if ("package-lock" === e.name || this.shouldIgnoreFile(e.name, ['.png', '.jpg', '.sample', '.lock', '.md', '.babelrc', '.vsix', '.vscodeignore'])) return;
@@ -52,8 +75,18 @@ class Minifier {
               break;
             case "html":
             case "ejs":
+            case "pug":
               s = htmlMinifier(t, { removeComments: true, collapseWhitespace: true });
               break;
+
+              case "xaml":
+              case "csproj":
+                s = this.minifyXAML(t);
+                break;
+
+                case "cs":
+                  s = this.minifyCSharpCode(t);; 
+                  break;
 
             default:
               throw new Error("Unsupported file format")
@@ -81,7 +114,7 @@ function getFiles(baseDir, currentDir, ignoredItems, ignoreDot, ignoreMin) {
   const items = fs.readdirSync(currentDir);
 
   // Add package-lock.json and dist to the ignoredItems list
-  ignoredItems.push('package-lock.json', 'dist');
+  ignoredItems.push('package-lock.json', 'dist', "obj", "bin", ".vscode");
 
   items.forEach(item => {
     const fullPath = path.join(currentDir, item);
@@ -140,9 +173,9 @@ const minifyCommand = vscode.commands.registerCommand("extension.minifyFiles", a
     canPickMany: !0,
     placeHolder: "Select options to ignore (use checkboxes)"
   }),
-    t = i.some(e => "dot" === e.value),
-    s = i.some(e => "other" === e.value),
-    n = i.some(e => "min" === e.value);
+    t = i ? i.some(e => "dot" === e.value) : false,
+      s = i ? i.some(e => "other" === e.value) : false,
+      n = i ? i.some(e => "min" === e.value) : false;
   let o = [];
   if (s) {
     const e = await vscode.window.showInputBox({
