@@ -1,4 +1,6 @@
 # Change Log
+v0.7.2
+The minified files will be ordered by last modified date. This way, you'll have more easy access to the recent files you have been working with.
 v0.7.0
 Added support for .xaml and .cs files
 

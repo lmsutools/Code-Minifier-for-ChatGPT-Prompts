@@ -1,151 +1,137 @@
-const fs = require("fs"),
-  path = require("path"),
-  vscode = require("vscode"),
-  htmlMinifier = require("html-minifier").minify,
-  JavaScriptObfuscator = require("javascript-obfuscator");
+const fs = require("fs");
+const path = require("path");
+const vscode = require("vscode");
+const htmlMinifier = require("html-minifier").minify;
+const JavaScriptObfuscator = require("javascript-obfuscator");
 
 class Minifier {
-  async obfuscateJsFiles(files) {
-    const obfuscatedSummary = [];
-    for (const file of files) {
-      const filePath = path.join(this.outputFilePath, "..", file.path);
-      try {
-        const fileContent = fs.readFileSync(filePath, "utf-8");
-        const obfuscatedCode = JavaScriptObfuscator.obfuscate(fileContent);
-        fs.writeFileSync(filePath, obfuscatedCode.getObfuscatedCode());
-        obfuscatedSummary.push(`<"file: ${file.path}">Successfully obfuscated</"file: ${file.path}">`);
-      } catch (error) {
-        obfuscatedSummary.push(`<"file: ${file.path}">Couldn't be obfuscated: ${error.message}</"file: ${file.path}">`);
-      }
+    constructor(files, outputFilePath) {
+        this.files = files;
+        this.outputFilePath = outputFilePath;
+        this.errors = [];
     }
-    fs.writeFileSync(path.join(this.outputFilePath, "..", "obfuscated.txt"), obfuscatedSummary.join("\n"));
-  }
-  constructor(e, i) {
-    this.files = e, this.outputFilePath = i, this.errors = []
-  }
 
-  shouldIgnoreFile(file, ignoredExtensions) {
-    return ignoredExtensions.some(ext => file.endsWith(ext));
-  }
-
-  customMinify(content) {
-    return content
-      .split('\n')
-      .map(line => line.trim())
-      .join('');
-  }
-
-  minifyXAML(content) {
-    return content
-      .replace(/\s*\n\s*/g, '')  // Remove line breaks and extra spaces
-      .replace(/\s*\>\s*/g, '>')  // Remove spaces around '>'
-      .replace(/\s*\</g, '<')     // Remove spaces around '<'
-      .replace(/\s+/g, ' ');      // Replace multiple spaces with single space
-  }
-  
-   minifyCSharpCode(code) {
-    // Remove single line comments
-    code = code.replace(/\/\/.*/g, '');
-    // Remove multi-line comments
-    code = code.replace(/\/\*[\s\S]*?\*\//g, '');
-    // Remove newlines
-    code = code.replace(/\n/g, '');
-    // Remove unnecessary spaces
-    code = code.replace(/\s+/g, ' ');
-    // Remove spaces before and after some special characters
-    code = code.replace(/\s*([;,:{}()])\s*/g, '$1');
-    return code;
-}
-
-  async minifyFiles() {
-    if (fs.existsSync(this.outputFilePath) && fs.unlinkSync(this.outputFilePath), await Promise.all(this.files.map(async e => {
-      if ("package-lock" === e.name || this.shouldIgnoreFile(e.name, ['.png', '.jpg', '.sample', '.lock', '.md', '.babelrc', '.vsix', '.vscodeignore'])) return;
-        const i = path.join(this.outputFilePath, "..", e.path),
-          t = fs.readFileSync(i).toString();
-        let s;
-        try {
-          switch (e.extension) {
-            case "scss":
-            case "tsx":
-            case "ts":
-            case "json":
-            case "js":
-            case "css":
-              s = this.customMinify(t);
-              break;
-            case "html":
-            case "ejs":
-            case "pug":
-              s = htmlMinifier(t, { removeComments: true, collapseWhitespace: true });
-              break;
-
-              case "xaml":
-              case "csproj":
-                s = this.minifyXAML(t);
-                break;
-
-                case "cs":
-                  s = this.minifyCSharpCode(t);; 
-                  break;
-
-            default:
-              throw new Error("Unsupported file format")
-          }
-          const n = `<"file: ${e.path}">`,
-            o = `</"file: ${e.path}">`;
-          fs.appendFileSync(this.outputFilePath, `${n}${s}${o}${n.includes("file: ")?"\n\n":""}`)
-        } catch (i) {
-          const t = `Error minifying ${e.path}: ${i.message}`;
-          this.errors.push(t)
+    async obfuscateJsFiles(filesToObfuscate) {
+        const obfuscationResults = [];
+        for (const file of filesToObfuscate) {
+            const filePath = path.join(this.outputFilePath, "..", file.path);
+            try {
+                const fileContent = fs.readFileSync(filePath, "utf-8");
+                const obfuscatedCode = JavaScriptObfuscator.obfuscate(fileContent);
+                fs.writeFileSync(filePath, obfuscatedCode.getObfuscatedCode());
+                obfuscationResults.push(`<"file: ${file.path}">Successfully obfuscated</"file: ${file.path}">`);
+            } catch (error) {
+                obfuscationResults.push(`<"file: ${file.path}">Couldn't be obfuscated: ${error.message}</"file: ${file.path}">`);
+            }
         }
-      })), this.errors.length > 0) {
-      const e = this.errors.join("\n"),
-        i = `<"file: error.txt">${e}</"file: error.txt">\n\n`;
-      fs.appendFileSync(this.outputFilePath, i);
-      const t = "Fix the errors and re-run the minify command.",
-        s = `<"file: instructions.txt">${t}</"file: instructions.txt">\n\n`;
-      fs.appendFileSync(this.outputFilePath, s)
+        fs.writeFileSync(path.join(this.outputFilePath, "..", "obfuscated.txt"), obfuscationResults.join("\n"));
     }
-  }
+
+    shouldIgnoreFile(fileName, ignoreList) {
+        return ignoreList.some((ignoreItem) => fileName.endsWith(ignoreItem));
+    }
+
+    customMinify(content) {
+        return content.split("\n").map((line) => line.trim()).join("");
+    }
+
+    minifyXAML(content) {
+        return content.replace(/\s*\n\s*/g, "").replace(/\s*\>\s*/g, ">").replace(/\s*\</g, "<").replace(/\s+/g, " ");
+    }
+
+    minifyCSharpCode(content) {
+        return content.replace(/\/\/.*/g, "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/\n/g, "").replace(/\s+/g, " ").replace(/\s*([;,:{}()])\s*/g, "$1");
+    }
+
+    async minifyFiles() {
+        // Sort files by modified time in descending order
+        this.files.sort((a, b) => b.modifiedTime - a.modifiedTime);
+
+        if (fs.existsSync(this.outputFilePath)) {
+            fs.unlinkSync(this.outputFilePath);
+        }
+
+        await Promise.all(this.files.map(async (file) => {
+            if (this.shouldIgnoreFile(file.name, ["package-lock.json", "dist", "obj", "bin", ".vscode", ".png", ".jpg", ".sample", ".lock", ".md", ".babelrc", ".vsix", ".vscodeignore"])) {
+                return;
+            }
+
+            const filePath = path.join(this.outputFilePath, "..", file.path);
+            const fileContent = fs.readFileSync(filePath).toString();
+
+            let minifiedContent;
+
+            try {
+                switch (file.extension) {
+                    case "scss":
+                    case "tsx":
+                    case "ts":
+                    case "json":
+                    case "js":
+                    case "css":
+                        minifiedContent = this.customMinify(fileContent);
+                        break;
+                    case "html":
+                    case "ejs":
+                    case "pug":
+                        minifiedContent = htmlMinifier(fileContent, { removeComments: true, collapseWhitespace: true });
+                        break;
+                    case "xaml":
+                    case "csproj":
+                        minifiedContent = this.minifyXAML(fileContent);
+                        break;
+                    case "cs":
+                        minifiedContent = this.minifyCSharpCode(fileContent);
+                        break;
+                    default:
+                        throw new Error("Unsupported file format");
+                }
+
+                const openTag = `<"file: ${file.path}">`;
+                const closeTag = `</"file: ${file.path}">`;
+
+                fs.appendFileSync(this.outputFilePath, `${openTag}${minifiedContent}${closeTag}\n\n`);
+            } catch (error) {
+                const errorMessage = `Error minifying ${file.path}: ${error.message}`;
+                this.errors.push(errorMessage);
+            }
+        }));
+
+        if (this.errors.length > 0) {
+            const errorsText = this.errors.join("\n");
+            fs.appendFileSync(this.outputFilePath, `<"file: error.txt">${errorsText}</"file: error.txt">\n\n`);
+        }
+    }
 }
 
-function getFiles(baseDir, currentDir, ignoredItems, ignoreDot, ignoreMin) {
-  const files = [];
-  const items = fs.readdirSync(currentDir);
+function getFiles(rootPath, currentPath, ignoreList, ignoreDotFiles, ignoreMinFiles) {
+    const files = [];
+    const directoryItems = fs.readdirSync(currentPath);
+    ignoreList.push("package-lock.json", "dist", "obj", "bin", ".vscode");
 
-  // Add package-lock.json and dist to the ignoredItems list
-  ignoredItems.push('package-lock.json', 'dist', "obj", "bin", ".vscode");
+    for (const itemName of directoryItems) {
+        const itemPath = path.join(currentPath, itemName);
+        const relativePath = path.relative(rootPath, itemPath);
+        if (ignoreList.includes(itemName) || ignoreList.includes(relativePath)) {
+            continue;
+        }
 
-  items.forEach(item => {
-    const fullPath = path.join(currentDir, item);
-    const relPath = path.relative(baseDir, fullPath);
+        const itemStat = fs.statSync(itemPath);
 
-    if (ignoredItems.includes(item) || ignoredItems.includes(relPath)) {
-      return;
+        if (itemStat.isDirectory()) {
+            if (itemName === "node_modules" || itemName === ".git") {
+                continue;
+            }
+            files.push(...getFiles(rootPath, itemPath, ignoreList, ignoreDotFiles, ignoreMinFiles));
+        } else if (itemStat.isFile()) {
+            const itemExtension = path.extname(itemName).substring(1);
+            if (ignoreDotFiles && itemName.startsWith(".") || ignoreMinFiles && ["min.js", "min.css"].includes(itemName)) {
+                continue;
+            }
+            files.push({ path: relativePath, name: itemName, extension: itemExtension, modifiedTime: itemStat.mtime });
+        }
     }
-
-    const stats = fs.statSync(fullPath);
-
-    if (stats.isDirectory()) {
-      if (item === "node_modules" || item === ".git") return; // Ignore node_modules and .git folder
-      files.push(...getFiles(baseDir, fullPath, ignoredItems, ignoreDot, ignoreMin));
-    } else if (stats.isFile()) {
-      const ext = path.extname(item).substring(1);
-
-      if ((ignoreDot && item.startsWith(".")) || (ignoreMin && ["min.js", "min.css"].includes(item))) {
-        return;
-      }
-
-
-      files.push({
-        path: relPath,
-        name: item,
-        extension: ext
-      });
-    }
-  });
-
-  return files;
+    return files;
 }
 
 const minifyCommand = vscode.commands.registerCommand("extension.minifyFiles", async () => {
