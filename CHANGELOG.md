@@ -1,4 +1,13 @@
 # Change Log
+v0.8.1
+New .py files support. It will make a summary of all the .py files in your project. It will ignore by default folders that starts with "env_". When selecting the option "Ignore any other file or extension" now you can also add file extensions, for example: ".json, .txt"
+
+v0.8.0
+Added support for .py files
+
+v0.7.3
+Added support for .ts and .js files
+
 v0.7.2
 The minified files will be ordered by last modified date. This way, you'll have more easy access to the recent files you have been working with.
 v0.7.0

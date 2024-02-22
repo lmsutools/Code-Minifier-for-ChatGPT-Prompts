@@ -71,6 +71,11 @@ class Minifier {
                     case "css":
                         minifiedContent = this.customMinify(fileContent);
                         break;
+
+                        case "py":
+                        minifiedContent = fileContent; // No minification for Python files
+                        break;
+                                          
                     case "html":
                     case "ejs":
                     case "pug":
@@ -104,35 +109,40 @@ class Minifier {
     }
 }
 
+
 function getFiles(rootPath, currentPath, ignoreList, ignoreDotFiles, ignoreMinFiles) {
-    const files = [];
-    const directoryItems = fs.readdirSync(currentPath);
-    ignoreList.push("package-lock.json", "dist", "obj", "bin", ".vscode");
+  const files = [];
+  const directoryItems = fs.readdirSync(currentPath);
+  ignoreList = ignoreList.concat(["package-lock.json", "dist", "obj", "bin", ".vscode"]); // Predefined ignore list
 
-    for (const itemName of directoryItems) {
-        const itemPath = path.join(currentPath, itemName);
-        const relativePath = path.relative(rootPath, itemPath);
-        if (ignoreList.includes(itemName) || ignoreList.includes(relativePath)) {
-            continue;
-        }
+  for (const itemName of directoryItems) {
+      const itemPath = path.join(currentPath, itemName);
+      const relativePath = path.relative(rootPath, itemPath);
+      const itemExtension = path.extname(itemName);
 
-        const itemStat = fs.statSync(itemPath);
+      // Check if the item name or its extension is in the ignore list
+      if (ignoreList.includes(itemName) || ignoreList.includes(relativePath) || ignoreList.includes(itemExtension)) {
+          continue;
+      }
 
-        if (itemStat.isDirectory()) {
-            if (itemName === "node_modules" || itemName === ".git") {
-                continue;
-            }
-            files.push(...getFiles(rootPath, itemPath, ignoreList, ignoreDotFiles, ignoreMinFiles));
-        } else if (itemStat.isFile()) {
-            const itemExtension = path.extname(itemName).substring(1);
-            if (ignoreDotFiles && itemName.startsWith(".") || ignoreMinFiles && ["min.js", "min.css"].includes(itemName)) {
-                continue;
-            }
-            files.push({ path: relativePath, name: itemName, extension: itemExtension, modifiedTime: itemStat.mtime });
-        }
-    }
-    return files;
+      const itemStat = fs.statSync(itemPath);
+
+      if (itemStat.isDirectory()) {
+          // Ignore directories starting with "env_" and other predefined directories
+          if (itemName.startsWith("env_") || itemName === "node_modules" || itemName === ".git") {
+              continue;
+          }
+          files.push(...getFiles(rootPath, itemPath, ignoreList, ignoreDotFiles, ignoreMinFiles));
+      } else if (itemStat.isFile()) {
+          if ((ignoreDotFiles && itemName.startsWith(".")) || (ignoreMinFiles && (itemExtension === ".min.js" || itemExtension === ".min.css"))) {
+              continue;
+          }
+          files.push({ path: relativePath, name: itemName, extension: itemExtension.substring(1), modifiedTime: itemStat.mtime }); // Removed the dot from the extension for consistency
+      }
+  }
+  return files;
 }
+
 
 const minifyCommand = vscode.commands.registerCommand("extension.minifyFiles", async () => {
   const e = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri : (await vscode.window.showOpenDialog({
@@ -165,9 +175,12 @@ const minifyCommand = vscode.commands.registerCommand("extension.minifyFiles", a
   let o = [];
   if (s) {
     const e = await vscode.window.showInputBox({
-      prompt: "Enter the file or folder names to ignore, separated by commas"
+      prompt: "Enter the file or folder names or extensions to ignore, separated by commas (e.g., .json, .txt)"
     });
-    e && (o = e.split(",").map(e => e.trim()))
+    if (e) {
+      o = e.split(",").map(e => e.trim()).filter(e => e);
+      // This will now include file extensions as well, e.g., ".json"
+    }
   }
   const r = e.fsPath,
     a = path.join(r, ".minifiedCodes.chatgpt"),
