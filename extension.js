@@ -4,11 +4,29 @@ const vscode = require("vscode");
 const htmlMinifier = require("html-minifier").minify;
 const JavaScriptObfuscator = require("javascript-obfuscator");
 
+const DEFAULT_IGNORE_LIST = [
+    "package-lock.json",
+    "dist",
+    "node_modules",
+    "obj",
+    "bin",
+    ".vscode",
+    ".png",
+    ".jpg",
+    ".sample",
+    ".lock",
+    ".md",
+    ".babelrc",
+    ".vsix",
+    ".vscodeignore"
+];
+
 class Minifier {
-    constructor(files, outputFilePath) {
+    constructor(files, outputFilePath, ignoreList) {
         this.files = files;
         this.outputFilePath = outputFilePath;
         this.errors = [];
+        this.ignoreList = ignoreList;
     }
 
     async obfuscateJsFiles(filesToObfuscate) {
@@ -19,16 +37,16 @@ class Minifier {
                 const fileContent = fs.readFileSync(filePath, "utf-8");
                 const obfuscatedCode = JavaScriptObfuscator.obfuscate(fileContent);
                 fs.writeFileSync(filePath, obfuscatedCode.getObfuscatedCode());
-                obfuscationResults.push(`<"file: ${file.path}">Successfully obfuscated</"file: ${file.path}">`);
+                obfuscationResults.push(`file: ${file.path} Successfully obfuscated`);
             } catch (error) {
-                obfuscationResults.push(`<"file: ${file.path}">Couldn't be obfuscated: ${error.message}</"file: ${file.path}">`);
+                obfuscationResults.push(`file: ${file.path} Couldn't be obfuscated: ${error.message}`);
             }
         }
         fs.writeFileSync(path.join(this.outputFilePath, "..", "obfuscated.txt"), obfuscationResults.join("\n"));
     }
 
     shouldIgnoreFile(fileName, ignoreList) {
-        return ignoreList.some((ignoreItem) => fileName.endsWith(ignoreItem));
+        return ignoreList && ignoreList.some((ignoreItem) => fileName.endsWith(ignoreItem));
     }
 
     customMinify(content) {
@@ -44,15 +62,12 @@ class Minifier {
     }
 
     async minifyFiles() {
-        // Sort files by modified time in descending order
         this.files.sort((a, b) => b.modifiedTime - a.modifiedTime);
 
-        if (fs.existsSync(this.outputFilePath)) {
-            fs.unlinkSync(this.outputFilePath);
-        }
+        let outputContent = '';
 
         await Promise.all(this.files.map(async (file) => {
-            if (this.shouldIgnoreFile(file.name, ["package-lock.json", "dist", "obj", "bin", ".vscode", ".png", ".jpg", ".sample", ".lock", ".md", ".babelrc", ".vsix", ".vscodeignore"])) {
+            if (this.shouldIgnoreFile(file.name, this.ignoreList)) {
                 return;
             }
 
@@ -71,11 +86,12 @@ class Minifier {
                     case "css":
                         minifiedContent = this.customMinify(fileContent);
                         break;
-
-                        case "py":
+                    case "vue":
+                        minifiedContent = this.minifyVueFile(fileContent);
+                        break;
+                    case "py":
                         minifiedContent = fileContent; // No minification for Python files
                         break;
-                                          
                     case "html":
                     case "ejs":
                     case "pug":
@@ -95,7 +111,7 @@ class Minifier {
                 const openTag = `<"file: ${file.path}">`;
                 const closeTag = `</"file: ${file.path}">`;
 
-                fs.appendFileSync(this.outputFilePath, `${openTag}${minifiedContent}${closeTag}\n\n`);
+                outputContent += `${openTag}${minifiedContent}${closeTag}\n\n`;
             } catch (error) {
                 const errorMessage = `Error minifying ${file.path}: ${error.message}`;
                 this.errors.push(errorMessage);
@@ -104,165 +120,227 @@ class Minifier {
 
         if (this.errors.length > 0) {
             const errorsText = this.errors.join("\n");
-            fs.appendFileSync(this.outputFilePath, `<"file: error.txt">${errorsText}</"file: error.txt">\n\n`);
+            outputContent += `<"file: error.txt">${errorsText}</"file: error.txt">\n\n`;
         }
+
+        fs.writeFileSync(this.outputFilePath, outputContent);
+    }
+
+    minifyVueFile(content) {
+        const script = content.match(/<script.*?>([\s\S]*?)<\/script>/);
+        const style = content.match(/<style.*?>([\s\S]*?)<\/style>/);
+        const template = content.match(/<template.*?>([\s\S]*?)<\/template>/);
+
+        let minifiedContent = '';
+
+        if (template) {
+            const minifiedTemplate = htmlMinifier(template[0], { removeComments: true, collapseWhitespace: true });
+            minifiedContent += minifiedTemplate;
+        }
+
+        if (script) {
+            const minifiedScript = this.customMinify(script[0]);
+            minifiedContent += minifiedScript;
+        }
+
+        if (style) {
+            const minifiedStyle = this.customMinify(style[0]);
+            minifiedContent += minifiedStyle;
+        }
+
+        return minifiedContent;
     }
 }
 
-
-function getFiles(rootPath, currentPath, ignoreList, ignoreDotFiles, ignoreMinFiles) {
-  const files = [];
-  const directoryItems = fs.readdirSync(currentPath);
-  ignoreList = ignoreList.concat(["package-lock.json", "dist", "obj", "bin", ".vscode"]); // Predefined ignore list
-
-  for (const itemName of directoryItems) {
-      const itemPath = path.join(currentPath, itemName);
-      const relativePath = path.relative(rootPath, itemPath);
-      const itemExtension = path.extname(itemName);
-
-      // Check if the item name or its extension is in the ignore list
-      if (ignoreList.includes(itemName) || ignoreList.includes(relativePath) || ignoreList.includes(itemExtension)) {
-          continue;
-      }
-
-      const itemStat = fs.statSync(itemPath);
-
-      if (itemStat.isDirectory()) {
-          // Ignore directories starting with "env_" and other predefined directories
-          if (itemName.startsWith("env_") || itemName === "node_modules" || itemName === ".git") {
-              continue;
-          }
-          files.push(...getFiles(rootPath, itemPath, ignoreList, ignoreDotFiles, ignoreMinFiles));
-      } else if (itemStat.isFile()) {
-          if ((ignoreDotFiles && itemName.startsWith(".")) || (ignoreMinFiles && (itemExtension === ".min.js" || itemExtension === ".min.css"))) {
-              continue;
-          }
-          files.push({ path: relativePath, name: itemName, extension: itemExtension.substring(1), modifiedTime: itemStat.mtime }); // Removed the dot from the extension for consistency
-      }
-  }
-  return files;
+function ensureDirectoryExistence(filePath) {
+    const dirname = path.dirname(filePath);
+    if (fs.existsSync(dirname)) {
+        return true;
+    }
+    ensureDirectoryExistence(dirname);
+    fs.mkdirSync(dirname);
 }
 
+function getFiles(rootPath, currentPath, userIgnoreList, ignoreDotFiles, ignoreMinFiles) {
+    const files = [];
+    const directoryItems = fs.readdirSync(currentPath);
+    const combinedIgnoreList = [...DEFAULT_IGNORE_LIST, ...userIgnoreList];
+
+    for (const itemName of directoryItems) {
+        const itemPath = path.join(currentPath, itemName);
+        const relativePath = path.relative(rootPath, itemPath);
+        const itemExtension = path.extname(itemName);
+
+        if (combinedIgnoreList.includes(itemName) || combinedIgnoreList.includes(relativePath) || combinedIgnoreList.includes(itemExtension)) {
+            continue;
+        }
+
+        const itemStat = fs.statSync(itemPath);
+
+        if (itemStat.isDirectory()) {
+            if (itemName.startsWith("env_") || itemName === "node_modules" || itemName === ".git") {
+                continue;
+            }
+            files.push(...getFiles(rootPath, itemPath, userIgnoreList, ignoreDotFiles, ignoreMinFiles));
+        } else if (itemStat.isFile()) {
+            if ((ignoreDotFiles && itemName.startsWith(".")) || (ignoreMinFiles && (itemExtension === ".min.js" || itemExtension === ".min.css"))) {
+                continue;
+            }
+            files.push({ path: relativePath, name: itemName, extension: itemExtension.substring(1), modifiedTime: itemStat.mtime });
+        }
+    }
+    return files;
+}
+
+function loadIgnoreOptions() {
+    const configPath = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, 'userSettings.json');
+    if (fs.existsSync(configPath)) {
+        const configContent = fs.readFileSync(configPath, 'utf-8');
+        return JSON.parse(configContent).ignoreOptions || [];
+    }
+    return [];
+}
+
+function saveIgnoreOptions(options) {
+    const configPath = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, 'userSettings.json');
+    let configContent = {};
+    if (fs.existsSync(configPath)) {
+        configContent = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    }
+    configContent.ignoreOptions = options;
+    fs.writeFileSync(configPath, JSON.stringify(configContent, null, 2));
+}
 
 const minifyCommand = vscode.commands.registerCommand("extension.minifyFiles", async () => {
-  const e = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri : (await vscode.window.showOpenDialog({
-    canSelectFiles: !1,
-    canSelectFolders: !0,
-    canSelectMany: !1,
-    openLabel: "Select Folder"
-  }))[0];
-  if (!e) return;
-  const i = await vscode.window.showQuickPick([{
-      label: "Ignore files starting by . (dot)?",
-      value: "dot"
-    },
-    {
-      label: 'Ignore files ending in "min.css" and "min.js"?',
-      value: "min",
-      picked: true
-    },
-    {
-      label: "Ignore any other file or folder?",
-      value: "other"
-    }
-  ], {
-    canPickMany: !0,
-    placeHolder: "Select options to ignore (use checkboxes)"
-  }),
-    t = i ? i.some(e => "dot" === e.value) : false,
-      s = i ? i.some(e => "other" === e.value) : false,
-      n = i ? i.some(e => "min" === e.value) : false;
-  let o = [];
-  if (s) {
-    const e = await vscode.window.showInputBox({
-      prompt: "Enter the file or folder names or extensions to ignore, separated by commas (e.g., .json, .txt)"
+    const folderUri = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri : (await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: "Select Folder"
+    }))[0];
+    if (!folderUri) return;
+
+    const savedIgnoreOptions = loadIgnoreOptions();
+    const quickPickOptions = [
+        { label: "Ignore files starting by . (dot)?", value: "dot" },
+        { label: 'Ignore files ending in "min.css" and "min.js"?', value: "min", picked: true },
+        { label: "Ignore any other file or folder?", value: "other" },
+        ...savedIgnoreOptions.map(option => ({ label: `Ignore ${option}`, value: option }))
+    ];
+
+    const selectedOptions = await vscode.window.showQuickPick(quickPickOptions, {
+        canPickMany: true,
+        placeHolder: "Select options to ignore (use checkboxes)"
     });
-    if (e) {
-      o = e.split(",").map(e => e.trim()).filter(e => e);
-      // This will now include file extensions as well, e.g., ".json"
-    }
-  }
-  const r = e.fsPath,
-    a = path.join(r, ".minifiedCodes.chatgpt"),
-    c = getFiles(r, r, o, t, n),
-    l = new Minifier(c, a);
-  l.minifyFiles();
-  const h = await vscode.workspace.openTextDocument(a);
-  await vscode.window.showTextDocument(h, vscode.ViewColumn.Active)
 
-  const obfuscationOption = await vscode.window.showQuickPick(
-    [
-      { label: "Obfuscate current JS file", value: "current" },
-      { label: "Obfuscate all JS in the workspace", value: "all" },
-    ],
-    { placeHolder: "Select an obfuscation option" }
-  );
+    const ignoreDotFiles = selectedOptions.some(option => option.value === "dot");
+    const ignoreMinFiles = selectedOptions.some(option => option.value === "min");
+    let customIgnoreOptions = selectedOptions.filter(option => option.value !== "dot" && option.value !== "min" && option.value !== "other").map(option => option.value);
 
-  const jsFiles = c.filter((file) => file.extension === "js");
-
-  
-  if (obfuscationOption && obfuscationOption.value) {
-    const jsFiles = c.filter((file) => file.extension === "js");
-
-    if (obfuscationOption.value === "current") {
-      const activeTextEditor = vscode.window.activeTextEditor;
-      if (activeTextEditor) {
-        const activeDocument = activeTextEditor.document;
-        const activeFile = jsFiles.find((file) => file.path === path.relative(r, activeDocument.uri.fsPath));
-        if (activeFile) {
-          await l.obfuscateJsFiles([activeFile]);
+    if (selectedOptions.some(option => option.value === "other")) {
+        const userInput = await vscode.window.showInputBox({
+            prompt: "Enter the file or folder names or extensions to ignore, separated by commas (e.g., .json, .txt)"
+        });
+        if (userInput) {
+            customIgnoreOptions = customIgnoreOptions.concat(userInput.split(",").map(item => item.trim()).filter(item => item));
         }
-      }
-    } else if (obfuscationOption.value === "all") {
-      await l.obfuscateJsFiles(jsFiles);
     }
-  }
-  
+
+    saveIgnoreOptions(customIgnoreOptions);
+
+    const rootPath = folderUri.fsPath;
+    const outputFilePath = path.join(rootPath, ".minifiedCodes.chatgpt");
+    ensureDirectoryExistence(outputFilePath);
+
+    // Close the file if it's already open
+    const openedDocument = vscode.workspace.textDocuments.find(doc => doc.fileName === outputFilePath);
+    if (openedDocument) {
+        await vscode.window.showTextDocument(openedDocument, { preview: false, viewColumn: vscode.ViewColumn.Active });
+        await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
+    }
+
+    // Delete the file if it exists
+    if (fs.existsSync(outputFilePath)) {
+        fs.unlinkSync(outputFilePath);
+    }
+
+    const files = getFiles(rootPath, rootPath, customIgnoreOptions, ignoreDotFiles, ignoreMinFiles);
+    const minifier = new Minifier(files, outputFilePath, customIgnoreOptions);
+
+    await minifier.minifyFiles();
+    const document = await vscode.workspace.openTextDocument(outputFilePath);
+    await vscode.window.showTextDocument(document, vscode.ViewColumn.Active);
+
+    const obfuscationOption = await vscode.window.showQuickPick(
+        [
+            { label: "Obfuscate current JS file", value: "current" },
+            { label: "Obfuscate all JS in the workspace", value: "all" }
+        ],
+        { placeHolder: "Select an obfuscation option" }
+    );
+
+    if (obfuscationOption && obfuscationOption.value) {
+        const jsFiles = files.filter(file => file.extension === "js");
+
+        if (obfuscationOption.value === "current") {
+            const activeTextEditor = vscode.window.activeTextEditor;
+            if (activeTextEditor) {
+                const activeDocument = activeTextEditor.document;
+                const activeFile = jsFiles.find(file => file.path === path.relative(rootPath, activeDocument.uri.fsPath));
+                if (activeFile) {
+                    await minifier.obfuscateJsFiles([activeFile]);
+                }
+            }
+        } else if (obfuscationOption.value === "all") {
+            await minifier.obfuscateJsFiles(jsFiles);
+        }
+    }
 });
 
 const obfuscateCurrentJSFile = vscode.commands.registerCommand("extension.obfuscateCurrentJSFile", async () => {
-  const e = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri : (await vscode.window.showOpenDialog({
-    canSelectFiles: !1,
-    canSelectFolders: !0,
-    canSelectMany: !1,
-    openLabel: "Select Folder"
-  }))[0];
-  if (!e) return;
+    const folderUri = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri : (await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: "Select Folder"
+    }))[0];
+    if (!folderUri) return;
 
-  const r = e.fsPath,
-    a = path.join(r, ".minifiedCodes.chatgpt"),
-    c = getFiles(r, r, [], false, false),
-    l = new Minifier(c, a);
+    const rootPath = folderUri.fsPath;
+    const outputFilePath = path.join(rootPath, ".minifiedCodes.chatgpt");
+    ensureDirectoryExistence(outputFilePath);
+    const files = getFiles(rootPath, rootPath, [], false, false);
+    const minifier = new Minifier(files, outputFilePath, []);
 
-  const activeTextEditor = vscode.window.activeTextEditor;
-  if (activeTextEditor) {
-    const activeDocument = activeTextEditor.document;
-    const activeFile = c.find((file) => file.path === path.relative(r, activeDocument.uri.fsPath) && file.extension === "js");
-    if (activeFile) {
-      await l.obfuscateJsFiles([activeFile]);
+    const activeTextEditor = vscode.window.activeTextEditor;
+    if (activeTextEditor) {
+        const activeDocument = activeTextEditor.document;
+        const activeFile = files.find(file => file.path === path.relative(rootPath, activeDocument.uri.fsPath) && file.extension === "js");
+        if (activeFile) {
+            await minifier.obfuscateJsFiles([activeFile]);
+        }
     }
-  }
 });
 
 const obfuscateAllJSInWorkspace = vscode.commands.registerCommand("extension.obfuscateAllJSInWorkspace", async () => {
-  const e = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri : (await vscode.window.showOpenDialog({
-    canSelectFiles: !1,
-    canSelectFolders: !0,
-    canSelectMany: !1,
-    openLabel: "Select Folder"
-  }))[0];
-  if (!e) return;
+    const folderUri = vscode.workspace.workspaceFolders ? vscode.workspace.workspaceFolders[0].uri : (await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: "Select Folder"
+    }))[0];
+    if (!folderUri) return;
 
-  const r = e.fsPath,
-    a = path.join(r, ".minifiedCodes.chatgpt"),
-    c = getFiles(r, r, [], false, false),
-    l = new Minifier(c, a);
+    const rootPath = folderUri.fsPath;
+    const outputFilePath = path.join(rootPath, ".minifiedCodes.chatgpt");
+    ensureDirectoryExistence(outputFilePath);
+    const files = getFiles(rootPath, rootPath, [], false, false);
+    const minifier = new Minifier(files, outputFilePath, []);
 
-  const jsFiles = c.filter((file) => file.extension === "js");
-  await l.obfuscateJsFiles(jsFiles);
+    const jsFiles = files.filter(file => file.extension === "js");
+    await minifier.obfuscateJsFiles(jsFiles);
 });
 
 exports.minifyCommand = minifyCommand;
 exports.obfuscateCurrentJSFile = obfuscateCurrentJSFile;
 exports.obfuscateAllJSInWorkspace = obfuscateAllJSInWorkspace;
-
