@@ -1,4 +1,15 @@
 # Change Log
+
+v0.8.3
+
+Added
+New context menu option "Minify Selected for ChatGPT" in the VS Code Explorer.
+Support for minifying multiple selected files and/or folders at once giving the ability to minify specific parts of the workspace instead of the entire workspace.
+ 
+ v0.8.2
+Ignore files memory: Now, the extension will remember the files you have selected to ignore.
+Added support for vue files.
+
 v0.8.1
 New .py files support. It will make a summary of all the .py files in your project. It will ignore by default folders that starts with "env_". When selecting the option "Ignore any other file or extension" now you can also add file extensions, for example: ".json, .txt"
 
