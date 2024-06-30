@@ -1,4 +1,16 @@
 # Change Log
+v0.8.4
+Added
+- New option "Edit custom ignore list" in the minification process.
+- Ability to open and edit the settings file directly from the extension command.
+- Improved user experience for managing custom ignore lists.
+
+Changed
+- Refactored the code to use `vscode.workspace.getConfiguration()` for better configuration management.
+
+Fixed
+- Resolved the "Unable to write to User Settings" error when saving custom ignore lists.
+
 
 v0.8.3
 

@@ -1,6 +1,6 @@
 {
   "name": "code-minifier-for-chatgpt-prompts",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "🚀 Minify files of a folder into one single file to make it part of ChatGPT Coding Prompts 🧠",
   "displayName": "Code Minifier for ChatGPT Prompts",
   "publisher": "lmsutools",
@@ -28,7 +28,7 @@
     "onCommand:extension.minifyFiles",
     "onCommand:extension.minifySelected"
   ],
-  "main": "./extension.js",
+  "main": "./src/extension.js",
   "author": "A ChatGPT Prompter",
   "icon": "images/icon.png",
   "license": "MIT",
@@ -69,9 +69,18 @@
           "command": "extension.minifySelected",
           "group": "YourExtensionGroup@1",
           "when": "explorerViewletVisible && filesExplorerFocus && !explorerResourceIsRoot"
-
         }
       ]
+    },
+    "configuration": {
+      "title": "Code Minifier for ChatGPT Prompts",
+      "properties": {
+        "minifier.minifierCustomIgnoreList": {
+          "type": "array",
+          "default": [],
+          "description": "Custom ignore list for minification"
+        }
+      }
     }
   }
 }
